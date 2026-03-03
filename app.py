@@ -3,81 +3,81 @@ from streamlit_cropper import st_cropper
 from PIL import Image
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 
-# --- THE SPEED FIX ---
-# This tells Streamlit: "Load this once, and never do it again!"
+# Configure the page layout to be wider
+st.set_page_config(layout="wide", page_title="Digit Recognizer")
+
+st.title("🔢 Handwritten Digit Recognizer")
+st.markdown("Take a photo of a single digit, crop it tightly, and watch the AI guess it!")
+
+# --- 1. CACHING THE MODEL ---
 @st.cache_resource
-def load_my_model():
-    return keras.models.load_model("my_mnist_model.keras")
+def load_tflite_model():
+    interpreter = tf.lite.Interpreter(model_path="mnist_model.tflite")
+    interpreter.allocate_tensors()
+    return interpreter
 
-# Call the function to get your model
-model = load_my_model()
+interpreter = load_tflite_model()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
-st.title("Capture and Crop Image")
-
-photo = st.camera_input("Take a picture")
-
+# --- 2. THE PREPROCESSING FUNCTION ---
 def prepare_my_image(image):
-    # 1. Load, grayscale, and resize
-        # 1. Convert to grayscale
     image = image.convert("L")
-
-    # 2. Resize to 28x28
     image = image.resize((28, 28))
-
-    # 3. Convert to numpy array
     img_array = np.array(image)
-    # 2. Invert the colors (White paper -> Black, Dark ink -> White)
+    
     img_array = 255.0 - img_array
-
-    # 3. Normalize to decimals (0.0 to 1.0)
     img_array = img_array / 255.0
 
-    # --- 4. THE NEW FIX: THRESHOLDING ---
-    # Any annoying gray background noise (below 0.5) gets crushed to pure black (0.0)
     img_array = np.where(img_array < 0.5, 0.0, img_array)
-
-    # Any light gray ink gets boosted to pure bright white (1.0)
     img_array = np.where(img_array > 0.5, 1.0, img_array)
 
-    # --- 5. VISUAL CHECK ---
-    # Let's plot it right inside the function so you can immediately see if it worked
-
-
-    # 6. Add the Batch dimension for the model
-    final_input = tf.expand_dims(img_array, axis=0)
-
+    final_input = np.reshape(img_array, (1, 28, 28, 1))
     return final_input
 
+# --- 3. THE UI LAYOUT ---
+# Create two main columns: Left for input, Right for results
+col1, col2 = st.columns([1, 1])
 
+with col1:
+    photo = st.camera_input("Take a picture")
 
-if photo is not None:
-    image = Image.open(photo)
-    
-    st.write("Crop the image so the number takes up the whole box:")
-
-    # The Cropper
-    cropped_img = st_cropper(
-        image,
-        realtime_update=True,
-        box_color="red",
-        aspect_ratio=(1, 1)  # Keeps it a perfect square!
-    )
-    if st.button("Use this cropped image"):
-        # Process the image
-        my_ready_image = prepare_my_image(cropped_img)
-    
-    # The button is now safely inside the block!
-    # It will only show up underneath the cropper.
-        if st.button("Predict"):
-            raw_predictions = model.predict(my_ready_image)
-            predicted_digit = np.argmax(raw_predictions)
+    if photo is not None:
+        image = Image.open(photo)
+        st.write("Crop the image so the number fills the red box:")
         
-            confidence_decimal = np.max(raw_predictions)
-            confidence_percentage = confidence_decimal * 100
-
-            st.success(f"The model is {confidence_percentage:.2f}% sure this is a {predicted_digit}!")
+        # The Cropper
+        cropped_img = st_cropper(
+            image,
+            realtime_update=True,
+            box_color="red",
+            aspect_ratio=(1, 1) 
+        )
         
-    
-    
+        # Save the cropped image to session state so we don't lose it
+        if st.button("Confirm Crop"):
+            st.session_state.ready_image = prepare_my_image(cropped_img)
+
+with col2:
+    # Only show this section if the user has successfully cropped an image
+    if "ready_image" in st.session_state:
+        st.subheader("Prediction Area")
+        
+        if st.button("Run AI Prediction", use_container_width=True, type="primary"):
+            # Use a spinner to give visual feedback
+            with st.spinner("Analyzing handwriting..."):
+                input_data = st.session_state.ready_image.astype(np.float32)
+
+                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.invoke()
+                raw_predictions = interpreter.get_tensor(output_details[0]['index'])
+
+                predicted_digit = np.argmax(raw_predictions)
+                confidence_percentage = np.max(raw_predictions) * 100
+
+            # Display the result beautifully!
+            st.success(f"## I am {confidence_percentage:.1f}% sure this is a {predicted_digit}!")
+            
+            # Optional: Show the raw probabilities as a bar chart!
+            st.bar_chart(raw_predictions[0])
