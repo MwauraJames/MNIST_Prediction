@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_cropper import st_cropper
 from PIL import Image
 import numpy as np
 import tensorflow as tf
@@ -6,7 +7,7 @@ from tensorflow import keras
 
 
 
-st.title("Take a Photo")
+st.title("Capture and Crop Image")
 
 photo = st.camera_input("Take a picture")
 
@@ -47,7 +48,16 @@ model = keras.models.load_model("my_mnist_model.keras")
 if photo is not None:
     image = Image.open(photo)
     
-    my_ready_image = prepare_my_image(image)
+    st.write("Crop the image to desired area:")
+
+    cropped_img = st_cropper(
+        image,
+        realtime_update=True,
+        box_color="red",
+        aspect_ratio=(1, 1)  # optional (square crop)
+    )
+    
+    my_ready_image = prepare_my_image(cropped_img)
     # Convert to numpy
 if st.button("Predict"):
     raw_predictions = model.predict(my_ready_image)
