@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-
+model = keras.models.load_model("my_mnist_model.keras")
 
 st.title("Capture and Crop Image")
 
@@ -43,27 +43,31 @@ def prepare_my_image(image):
 
     return final_input
 
-model = keras.models.load_model("my_mnist_model.keras")
+
 
 if photo is not None:
     image = Image.open(photo)
     
-    st.write("Crop the image to desired area:")
+    st.write("Crop the image so the number takes up the whole box:")
 
+    # The Cropper
     cropped_img = st_cropper(
         image,
         realtime_update=True,
         box_color="red",
-        aspect_ratio=(1, 1)  # optional (square crop)
+        aspect_ratio=(1, 1)  # Keeps it a perfect square!
     )
     
+    # Process the image
     my_ready_image = prepare_my_image(cropped_img)
-    # Convert to numpy
-if st.button("Predict"):
-    raw_predictions = model.predict(my_ready_image)
-    predicted_digit = np.argmax(raw_predictions)
+    
+    # The button is now safely inside the block!
+    # It will only show up underneath the cropper.
+    if st.button("Predict"):
+        raw_predictions = model.predict(my_ready_image)
+        predicted_digit = np.argmax(raw_predictions)
+        
+        confidence_decimal = np.max(raw_predictions)
+        confidence_percentage = confidence_decimal * 100
 
-    confidence_decimal = np.max(raw_predictions)
-    confidence_percentage = confidence_decimal * 100
-
-    st.text(f"The model is {confidence_percentage:.2f}% sure this is a {predicted_digit}!")
+        st.success(f"The model is {confidence_percentage:.2f}% sure this is a {predicted_digit}!")
