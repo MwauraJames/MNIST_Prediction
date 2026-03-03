@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-model = keras.models.load_model("my_mnist_model.keras")
+
 
 st.title("Take a Photo")
 
@@ -42,6 +42,7 @@ def prepare_my_image(image):
 
     return final_input
 
+model = keras.models.load_model("my_mnist_model.keras")
 
 if photo is not None:
     image = Image.open(photo)
