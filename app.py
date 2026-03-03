@@ -5,7 +5,14 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-model = keras.models.load_model("my_mnist_model.keras")
+# --- THE SPEED FIX ---
+# This tells Streamlit: "Load this once, and never do it again!"
+@st.cache_resource
+def load_my_model():
+    return keras.models.load_model("my_mnist_model.keras")
+
+# Call the function to get your model
+model = load_my_model()
 
 st.title("Capture and Crop Image")
 
