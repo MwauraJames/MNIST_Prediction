@@ -3,6 +3,7 @@ from streamlit_cropper import st_cropper
 from PIL import Image
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 # Configure the page layout to be wider
 st.set_page_config(layout="wide", page_title="Digit Recognizer")
@@ -10,16 +11,7 @@ st.set_page_config(layout="wide", page_title="Digit Recognizer")
 st.title("🔢 Handwritten Digit Recognizer")
 st.markdown("Take a photo of a single digit, crop it tightly, and watch the AI guess it!")
 
-# --- 1. CACHING THE MODEL ---
-@st.cache_resource
-def load_tflite_model():
-    interpreter = tf.lite.Interpreter(model_path="mnist_model.tflite")
-    interpreter.allocate_tensors()
-    return interpreter
-
-interpreter = load_tflite_model()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+model=tf.keras.models.load_model("my_mnist_model.keras")
 
 # --- 2. THE PREPROCESSING FUNCTION ---
 def prepare_my_image(image):
@@ -58,6 +50,18 @@ with col1:
         # Save the cropped image to session state so we don't lose it
         if st.button("Confirm Crop"):
             st.session_state.ready_image = prepare_my_image(cropped_img)
+            
+# (Assuming my_ready_image is the output of your preparation function)
+# Let's pull the 28x28 grid back out of the batch
+            image_to_view = st.session_state.ready_image[0, :, :, 0]
+
+            # Create figure properly
+            fig, ax = plt.subplots()
+            ax.imshow(image_to_view, cmap='gray')
+            ax.set_title("What the Neural Network Sees")
+            ax.axis("off")
+
+            st.pyplot(fig)
 
 with col2:
     # Only show this section if the user has successfully cropped an image
@@ -68,16 +72,27 @@ with col2:
             # Use a spinner to give visual feedback
             with st.spinner("Analyzing handwriting..."):
                 input_data = st.session_state.ready_image.astype(np.float32)
+                raw_predictions = model.predict(input_data)
 
-                interpreter.set_tensor(input_details[0]['index'], input_data)
-                interpreter.invoke()
-                raw_predictions = interpreter.get_tensor(output_details[0]['index'])
+# Optional: Print the raw math just to see what the neural network is "thinking"
 
+# 2. Find the POSITION (index) of the highest probability
+# Since index 0 represents the digit 0, index 1 is 1, etc.,
+# the index perfectly matches our predicted digit!
                 predicted_digit = np.argmax(raw_predictions)
-                confidence_percentage = np.max(raw_predictions) * 100
+
+# 3. Grab the actual confidence score for that winning digit
+                confidence_decimal = np.max(raw_predictions)
+                confidence_percentage = confidence_decimal * 100
 
             # Display the result beautifully!
             st.success(f"## I am {confidence_percentage:.1f}% sure this is a {predicted_digit}!")
             
             # Optional: Show the raw probabilities as a bar chart!
             st.bar_chart(raw_predictions[0])
+            if st.button("Try Another Number"):
+                # Delete the saved image from memory
+                del st.session_state.ready_image
+                # Force the page to reload instantly
+                st.rerun()
+            
