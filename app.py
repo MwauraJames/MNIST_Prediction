@@ -22,8 +22,9 @@ def prepare_my_image(image):
     img_array = 255.0 - img_array
     img_array = img_array / 255.0
 
+    
     img_array = np.where(img_array < 0.5, 0.0, img_array)
-    img_array = np.where(img_array > 0.5, 1.0, img_array)
+    #img_array = np.where(img_array > 0.5, 1.0, img_array)
 
     final_input = np.reshape(img_array, (1, 28, 28, 1))
     return final_input
