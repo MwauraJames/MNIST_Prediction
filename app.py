@@ -11,8 +11,15 @@ st.set_page_config(layout="wide", page_title="Digit Recognizer")
 st.title("🔢 Handwritten Digit Recognizer")
 st.markdown("Take a photo of a single digit, crop it tightly, and watch the AI guess it!")
 
-model=tf.keras.models.load_model("my_mnist_model.keras")
+@st.cache_resource
+def load_tflite_model():
+    interpreter = tf.lite.Interpreter(model_path="mnist_model.tflite")
+    interpreter.allocate_tensors()
+    return interpreter
 
+interpreter = load_tflite_model()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 # --- 2. THE PREPROCESSING FUNCTION ---
 def prepare_my_image(image):
     image = image.convert("L")
@@ -73,18 +80,13 @@ with col2:
             # Use a spinner to give visual feedback
             with st.spinner("Analyzing handwriting..."):
                 input_data = st.session_state.ready_image.astype(np.float32)
-                raw_predictions = model.predict(input_data)
 
-# Optional: Print the raw math just to see what the neural network is "thinking"
+                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.invoke()
+                raw_predictions = interpreter.get_tensor(output_details[0]['index'])
 
-# 2. Find the POSITION (index) of the highest probability
-# Since index 0 represents the digit 0, index 1 is 1, etc.,
-# the index perfectly matches our predicted digit!
                 predicted_digit = np.argmax(raw_predictions)
-
-# 3. Grab the actual confidence score for that winning digit
-                confidence_decimal = np.max(raw_predictions)
-                confidence_percentage = confidence_decimal * 100
+                confidence_percentage = np.max(raw_predictions) * 100
 
             # Display the result beautifully!
             st.success(f"## I am {confidence_percentage:.1f}% sure this is a {predicted_digit}!")
