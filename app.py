@@ -13,7 +13,7 @@ st.markdown("Take a photo of a single digit, crop it tightly, and watch the AI g
 
 @st.cache_resource
 def load_tflite_model():
-    interpreter = tf.lite.Interpreter(model_path="mnist_model.tflite")
+    interpreter = tf.lite.Interpreter(model_path="mnist_model.v2.tflite")
     interpreter.allocate_tensors()
     return interpreter
 
